@@ -1,0 +1,300 @@
+#root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #000;
+}
+
+.game-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.top-ui {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.health-section {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+}
+
+.health-section.player { align-items: flex-start; }
+.health-section.ai { align-items: flex-end; }
+
+.name {
+  color: white;
+  font-weight: 900;
+  font-size: 20px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+  margin-bottom: 5px;
+  letter-spacing: 2px;
+}
+
+.fancy-bar {
+  width: 100%;
+  height: 35px;
+  background: rgba(0,0,0,0.6);
+  border: 3px solid #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(0,0,0,0.5);
+  transform: skewX(-15deg);
+  display: flex;
+}
+
+.health-section.player .fancy-bar { justify-content: flex-end; }
+.health-section.ai .fancy-bar { 
+  transform: skewX(15deg); 
+  justify-content: flex-start;
+}
+
+.fancy-fill {
+  height: 100%;
+  background: linear-gradient(to bottom, #00ff00, #008800);
+  transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.5);
+}
+
+.health-section.ai .fancy-fill {
+  background: linear-gradient(to bottom, #ff0000, #880000);
+}
+
+.health-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) skewX(15deg);
+  color: white;
+  font-weight: bold;
+  font-size: 18px;
+  text-shadow: 1px 1px 2px black;
+}
+
+.health-section.ai .health-text { transform: translate(-50%, -50%) skewX(-15deg); }
+
+.timer-section {
+  width: 100px;
+  display: flex;
+  justify-content: center;
+}
+
+.timer-box {
+  color: gold;
+  font-size: 84px;
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 0 15px rgba(0,0,0,1), 0 0 5px gold;
+  line-height: 1;
+}
+
+.pause-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 300;
+  pointer-events: all;
+}
+
+.pause-menu {
+  background: #222;
+  border: 4px solid #fff;
+  padding: 40px;
+  min-width: 300px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 0 30px rgba(0,0,0,1);
+}
+
+.pause-menu h2 {
+  color: gold;
+  margin-top: 0;
+  font-size: 32px;
+  letter-spacing: 4px;
+}
+
+.menu-section {
+  margin-bottom: 25px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.menu-section label {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #aaa;
+  text-transform: uppercase;
+}
+
+.btn-group.vertical {
+  flex-direction: column;
+  width: 100%;
+}
+
+.btn-group.vertical button {
+  width: 100%;
+  margin-bottom: 5px;
+}
+
+.resume-btn {
+  background: #44ff44 !important;
+  color: black !important;
+  border-color: #44ff44 !important;
+  font-size: 18px !important;
+  padding: 10px 30px !important;
+  margin-top: 10px;
+}
+
+.btn-group button.selected, .resume-btn.selected {
+  border-color: gold !important;
+  box-shadow: 0 0 15px gold !important;
+  transform: scale(1.05);
+}
+
+.menu-section.row-selected {
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 10px;
+  margin-left: -10px;
+  margin-right: -10px;
+}
+
+.btn-group button.active.selected {
+  background: white;
+  color: black;
+}
+
+.btn-group {
+  display: flex;
+  gap: 10px;
+  pointer-events: all;
+}
+
+.btn-group button {
+  background: rgba(0,0,0,0.7);
+  color: white;
+  border: 2px solid white;
+  padding: 8px 15px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.btn-group button.active {
+  background: gold;
+  color: black;
+  border-color: gold;
+  box-shadow: 0 0 15px gold;
+}
+
+.btn-group button:hover:not(.active) {
+  background: white;
+  color: black;
+}
+
+.countdown-overlay {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  transform: translateY(-50%);
+  font-size: 180px;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 0 30px rgba(0,0,0,1);
+  pointer-events: none;
+  text-align: center;
+  z-index: 100;
+}
+
+.countdown-overlay.fight {
+  color: #ff3300;
+  font-size: 220px;
+}
+
+.controls-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  background-color: rgba(0,0,0,0.7);
+  padding: 12px 25px;
+  border-radius: 30px;
+  font-size: 14px;
+  text-shadow: 1px 1px 1px black;
+  border: 2px solid rgba(255,255,255,0.2);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.game-over {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(45deg, rgba(0,0,0,0.9), rgba(50,0,0,0.9));
+  color: gold;
+  padding: 60px;
+  font-size: 64px;
+  font-weight: 900;
+  text-align: center;
+  pointer-events: all;
+  border: 8px solid gold;
+  border-radius: 20px;
+  box-shadow: 0 0 50px rgba(0,0,0,1);
+  text-transform: uppercase;
+  letter-spacing: 5px;
+  z-index: 200;
+  min-width: 500px;
+}
+
+.game-over button {
+  margin-top: 30px;
+  padding: 15px 40px;
+  font-size: 28px;
+  cursor: pointer;
+  background-color: gold;
+  border: none;
+  font-weight: 900;
+  transition: transform 0.2s;
+}
+
+.game-over button:hover {
+  transform: scale(1.1);
+}
