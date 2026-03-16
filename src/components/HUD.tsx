@@ -15,7 +15,7 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
     const [vsPlayer, setVsPlayer] = useState(false);
     const [p1Gamepad, setP1Gamepad] = useState("Disconnected");
     const [p2Gamepad, setP2Gamepad] = useState("Disconnected");
-    const [gameState, setGameState] = useState<string>("COUNTDOWN");
+    const [gameState, setGameState] = useState<string>("MAIN_MENU");
     const [selectedRow, setSelectedRow] = useState(0);
 
     useEffect(() => {
@@ -40,6 +40,10 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
         return () => clearInterval(interval);
     }, [gameLoop]);
 
+    const handleStart = () => {
+        if (gameLoop) gameLoop.startGame();
+    };
+
     const resumeGame = () => {
         window.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'escape' }));
     };
@@ -50,7 +54,7 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
 
     const getBtnClass = (row: number, active: boolean) => {
         let cls = active ? "active" : "";
-        if (gameState === "PAUSED" && selectedRow === row) {
+        if (selectedRow === row) {
             cls += " selected";
         }
         return cls;
@@ -58,11 +62,46 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
 
     const getAiBtnClass = (mode: AIMode) => {
         let cls = currentAiMode === mode ? "active" : "";
-        if (gameState === "PAUSED" && selectedRow === 1 && currentAiMode === mode) {
+        if (selectedRow === 1 && currentAiMode === mode) {
             cls += " selected";
         }
         return cls;
     };
+
+    if (gameState === "MAIN_MENU") {
+        return (
+            <div className="hud">
+                <div className="main-menu-overlay">
+                    <div className="main-menu-content">
+                        <h1 className="game-title">PAW FIGHTER</h1>
+                        <p className="game-subtitle">The Furriest Combat Engine</p>
+                        
+                        <div className="menu-sections-wrapper">
+                            <div className={`menu-section ${selectedRow === 0 ? "row-selected" : ""}`}>
+                                <label>Match Type:</label>
+                                <div className="btn-group">
+                                    <button className={getBtnClass(0, !vsPlayer)} onClick={toggleVsMode}>VS AI</button>
+                                    <button className={getBtnClass(0, vsPlayer)} onClick={toggleVsMode}>VS PLAYER</button>
+                                </div>
+                            </div>
+
+                            <div className={`menu-section ${selectedRow === 1 ? "row-selected" : ""}`}>
+                                <button className={`start-btn ${selectedRow === 1 ? "selected" : ""}`} onClick={handleStart}>START MATCH</button>
+                            </div>
+                        </div>
+
+                        <div className="controls-footer">
+                            <p>Use D-PAD / WASD to Navigate | A / SPACE to Select</p>
+                            <div className="gp-status-row">
+                                <span>P1: {p1Gamepad}</span>
+                                <span>P2: {p2Gamepad}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="hud">
@@ -112,6 +151,7 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
                                 <div className="btn-group vertical">
                                     <button className={getAiBtnClass("STAND")}>STAND</button>
                                     <button className={getAiBtnClass("CROUCH")}>CROUCH</button>
+                                    <button className={getAiBtnClass("BLOCK")}>BLOCK</button>
                                     <button className={getAiBtnClass("DEFEND")}>DEFEND</button>
                                     <button className={getAiBtnClass("OFFENSE")}>OFFENSE</button>
                                 </div>

@@ -4,7 +4,7 @@ import { AI, type AIMode } from "./entities/AI";
 import { InputManager } from "./InputManager";
 import { CharacterState } from "./entities/Character";
 
-export type GameState = "COUNTDOWN" | "BATTLE" | "GAMEOVER" | "PAUSED";
+export type GameState = "MAIN_MENU" | "COUNTDOWN" | "BATTLE" | "GAMEOVER" | "PAUSED";
 
 export class GameLoop {
     private scene: Scene;
@@ -12,9 +12,9 @@ export class GameLoop {
     private p2: Character;
     private vsPlayer: boolean = false;
     private inputManager: InputManager;
-    private prevState: GameState = "COUNTDOWN";
+    private prevState: GameState = "MAIN_MENU";
     
-    private gameState: GameState = "COUNTDOWN";
+    private gameState: GameState = "MAIN_MENU";
     private countdownTimer: number = 3.5;
     private battleTimer: number = 99;
 
@@ -29,10 +29,18 @@ export class GameLoop {
         // Default to AI
         this.p2 = new AI(scene);
         (this.p2 as AI).setTarget(this.p1);
+        (this.p2 as AI).setMode(this.currentAiMode);
 
         this.scene.onBeforeRenderObservable.add(() => {
             this.update();
         });
+    }
+
+    public startGame(): void {
+        if (this.gameState === "MAIN_MENU") {
+            this.gameState = "COUNTDOWN";
+            this.resetGame();
+        }
     }
 
     public toggleVsPlayer(): void {
@@ -55,19 +63,28 @@ export class GameLoop {
             (this.p2 as AI).setMode(this.currentAiMode);
         }
         
-        this.gameState = "COUNTDOWN";
         this.countdownTimer = 3.5;
         this.battleTimer = 99;
+        // Don't change gameState if we are in MAIN_MENU or PAUSED
+        if (this.gameState !== "MAIN_MENU" && this.gameState !== "PAUSED") {
+            this.gameState = "COUNTDOWN";
+        }
     }
 
     private update(): void {
         const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
 
+        if (this.gameState === "MAIN_MENU") {
+            this.handleMenuNavigation();
+            this.inputManager.postUpdate();
+            return;
+        }
+
         // Handle Pause Toggle
         if (this.inputManager.isJustPressed("pause", 0) || this.inputManager.isJustPressed("pause", 1)) {
             if (this.gameState === "PAUSED") {
                 this.gameState = this.prevState;
-            } else {
+            } else if (this.gameState !== "GAMEOVER" && this.gameState !== "COUNTDOWN") {
                 this.prevState = this.gameState;
                 this.gameState = "PAUSED";
                 this.menuSelectedRow = 0;
@@ -94,7 +111,6 @@ export class GameLoop {
                 this.gameState = "GAMEOVER";
             }
 
-            // Water Hazard Logic
             this.checkWaterHazard(this.p1, deltaTime);
             this.checkWaterHazard(this.p2, deltaTime);
         }
@@ -128,12 +144,8 @@ export class GameLoop {
     private checkWaterHazard(char: Character, deltaTime: number): void {
         const dist = Math.sqrt(char.mesh.position.x ** 2 + char.mesh.position.z ** 2);
         const waterLevel = -0.8;
-        
-        // If inside the lake radius and below water surface
         if (dist < 16 && char.mesh.position.y < waterLevel + 0.5) {
-            char.takeDamage(1.5 * deltaTime); // Slow drain
-            
-            // Occasional splash VFX
+            char.takeDamage(1.5 * deltaTime);
             if (Math.random() < 0.05) {
                 this.spawnSplashVFX(char.mesh.position.clone());
             }
@@ -142,26 +154,16 @@ export class GameLoop {
 
     private spawnSplashVFX(position: Vector3): void {
         const splash = MeshBuilder.CreateTorus("splash", { diameter: 1.0, thickness: 0.1 }, this.scene);
-        position.y = -0.8; // At water level
+        position.y = -0.8;
         splash.position.copyFrom(position);
-        
         const mat = new StandardMaterial("splashMat", this.scene);
         mat.diffuseColor = new Color3(0.4, 0.6, 1.0);
         mat.alpha = 0.6;
         splash.material = mat;
-
         const anim = new Animation("splashAnim", "scaling", 60, Animation.ANIMATIONTYPE_VECTOR3, Animation.ANIMATIONLOOPMODE_CONSTANT);
-        anim.setKeys([
-            { frame: 0, value: new Vector3(0.5, 0.5, 0.5) },
-            { frame: 20, value: new Vector3(2.5, 0.1, 2.5) }
-        ]);
-        
+        anim.setKeys([{ frame: 0, value: new Vector3(0.5, 0.5, 0.5) }, { frame: 20, value: new Vector3(2.5, 0.1, 2.5) }]);
         const animAlpha = new Animation("splashAlpha", "material.alpha", 60, Animation.ANIMATIONTYPE_FLOAT, Animation.ANIMATIONLOOPMODE_CONSTANT);
-        animAlpha.setKeys([
-            { frame: 0, value: 0.6 },
-            { frame: 20, value: 0 }
-        ]);
-
+        animAlpha.setKeys([{ frame: 0, value: 0.6 }, { frame: 20, value: 0 }]);
         splash.animations = [anim, animAlpha];
         this.scene.beginAnimation(splash, 0, 20, false, 1, () => {
             splash.dispose();
@@ -176,15 +178,16 @@ export class GameLoop {
         const right = this.inputManager.isJustPressed("right", 0) || this.inputManager.isJustPressed("right", 1);
         const select = this.inputManager.isJustPressed("attack", 0) || this.inputManager.isJustPressed("attack", 1);
 
-        const maxRow = this.vsPlayer ? 1 : 2; // 0: Type, 1: Mode (AI only), 2: Resume
-        const resumeRow = this.vsPlayer ? 1 : 2;
+        const isMainMenu = this.gameState === "MAIN_MENU";
+        const maxRow = isMainMenu ? 1 : (this.vsPlayer ? 1 : 2); 
+        const resumeRow = isMainMenu ? 1 : (this.vsPlayer ? 1 : 2);
 
         if (up) this.menuSelectedRow = (this.menuSelectedRow > 0) ? this.menuSelectedRow - 1 : resumeRow;
         if (down) this.menuSelectedRow = (this.menuSelectedRow < resumeRow) ? this.menuSelectedRow + 1 : 0;
 
         if (this.menuSelectedRow === 0) {
             if (left || right) this.toggleVsPlayer();
-        } else if (this.menuSelectedRow === 1 && !this.vsPlayer) {
+        } else if (!isMainMenu && this.menuSelectedRow === 1 && !this.vsPlayer) {
             const modes: AIMode[] = ["STAND", "CROUCH", "BLOCK", "DEFEND", "OFFENSE"];
             let idx = modes.indexOf(this.currentAiMode);
             if (left) idx = (idx - 1 + modes.length) % modes.length;
@@ -195,7 +198,8 @@ export class GameLoop {
 
         if (select) {
             if (this.menuSelectedRow === resumeRow) {
-                this.gameState = this.prevState;
+                if (isMainMenu) this.startGame();
+                else this.gameState = this.prevState;
             } else if (this.menuSelectedRow === 0) {
                 this.toggleVsPlayer();
             }
@@ -208,12 +212,10 @@ export class GameLoop {
         const p2PosXZ = new Vector3(this.p2.mesh.position.x, 0, this.p2.mesh.position.z);
         let distVec = p1PosXZ.subtract(p2PosXZ);
         let distance = distVec.length();
-        
         if (distance < 0.01) {
             distVec = new Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
             distance = 0.1;
         }
-
         if (distance < minDistance) {
             const overlap = minDistance - distance;
             const pushDir = distVec.normalize();
@@ -234,25 +236,17 @@ export class GameLoop {
     private checkCollisions(): void {
         if (this.gameState !== "BATTLE") return;
         const attackDistance = 2.2;
-        
-        // P1 Attacking P2
         if (this.p1.state === CharacterState.ATTACKING && !this.p1.hasHitThisAttack) {
             const distance = Vector3.Distance(this.p1.mesh.position, this.p2.mesh.position);
             const heightDiff = Math.abs(this.p1.mesh.position.y - this.p2.mesh.position.y);
-            
             if (distance < attackDistance && heightDiff < 1.0 && this.p2.state !== CharacterState.HIT && this.p2.state !== CharacterState.ROLLING) {
                 this.p1.hasHitThisAttack = true;
                 const isBlocking = this.p2.state === CharacterState.BLOCKING;
-                const isCounter = this.p1.counterTimer > 0;
-
-                if (isCounter) {
-                    // Counter hit! P2 rolls back
-                    this.p2.takeDamage(15);
-                    this.p2.triggerRoll(this.p1.mesh.position);
+                if (this.p1.counterTimer > 0) {
+                    this.p2.takeDamage(15); this.p2.triggerRoll(this.p1.mesh.position);
                     this.spawnHitVFX(this.p2.mesh.position.add(new Vector3(0, 1, 0)), false, true);
                 } else if (isBlocking) {
-                    this.p2.takeDamage(2);
-                    this.p2.counterTimer = 0.6; // Give P2 a window to counter
+                    this.p2.takeDamage(2); this.p2.counterTimer = 0.6;
                     this.spawnHitVFX(this.p2.mesh.position.add(new Vector3(0, 1, 0)), true);
                 } else {
                     this.p2.takeDamage(this.p2.state === CharacterState.CROUCHING ? 2 : 10);
@@ -260,25 +254,17 @@ export class GameLoop {
                 }
             }
         }
-
-        // P2 Attacking P1
         if (this.p2.state === CharacterState.ATTACKING && !this.p2.hasHitThisAttack) {
             const distance = Vector3.Distance(this.p2.mesh.position, this.p1.mesh.position);
             const heightDiff = Math.abs(this.p1.mesh.position.y - this.p2.mesh.position.y);
-            
             if (distance < attackDistance && heightDiff < 1.0 && this.p1.state !== CharacterState.HIT && this.p1.state !== CharacterState.ROLLING) {
                 this.p2.hasHitThisAttack = true;
                 const isBlocking = this.p1.state === CharacterState.BLOCKING;
-                const isCounter = this.p2.counterTimer > 0;
-
-                if (isCounter) {
-                    // Counter hit! P1 rolls back
-                    this.p1.takeDamage(15);
-                    this.p1.triggerRoll(this.p2.mesh.position);
+                if (this.p2.counterTimer > 0) {
+                    this.p1.takeDamage(15); this.p1.triggerRoll(this.p2.mesh.position);
                     this.spawnHitVFX(this.p1.mesh.position.add(new Vector3(0, 1, 0)), false, true);
                 } else if (isBlocking) {
-                    this.p1.takeDamage(2);
-                    this.p1.counterTimer = 0.6; // Give P1 a window to counter
+                    this.p1.takeDamage(2); this.p1.counterTimer = 0.6;
                     this.spawnHitVFX(this.p1.mesh.position.add(new Vector3(0, 1, 0)), true);
                 } else {
                     this.p1.takeDamage(this.p1.state === CharacterState.CROUCHING ? 2 : 10);
@@ -292,46 +278,26 @@ export class GameLoop {
         const star = MeshBuilder.CreateTorusKnot("hitVFX", { radius: 0.6, tube: 0.08, radialSegments: 32, tubularSegments: 12, p: 2, q: 3 }, this.scene);
         star.position.copyFrom(position);
         star.renderingGroupId = 2;
-        
         const mat = new StandardMaterial("hitMat", this.scene);
-        if (isCounter) {
-            mat.emissiveColor = new Color3(1, 0.2, 0.2); // Red for counter
-        } else if (isBlocked) {
-            mat.emissiveColor = new Color3(0.5, 0.8, 1); // Blue for block
-        } else {
-            mat.emissiveColor = new Color3(1, 0.8, 0.2); // Gold for hit
-        }
-
+        if (isCounter) mat.emissiveColor = new Color3(1, 0.2, 0.2); 
+        else if (isBlocked) mat.emissiveColor = new Color3(0.5, 0.8, 1);
+        else mat.emissiveColor = new Color3(1, 0.8, 0.2);
+        mat.disableLighting = true; mat.alpha = 0.8; mat.alphaMode = Engine.ALPHA_ADD; mat.zOffset = -10;
+        star.material = mat;
         const animScale = new Animation("hitScale", "scaling", 60, Animation.ANIMATIONTYPE_VECTOR3, Animation.ANIMATIONLOOPMODE_CONSTANT);
-        animScale.setKeys([
-            { frame: 0, value: new Vector3(0.1, 0.1, 0.1) },
-            { frame: 5, value: new Vector3(1.5, 1.5, 1.5) },
-            { frame: 10, value: new Vector3(0, 0, 0) }
-        ]);
-
+        animScale.setKeys([{ frame: 0, value: new Vector3(0.1, 0.1, 0.1) }, { frame: 5, value: new Vector3(1.5, 1.5, 1.5) }, { frame: 10, value: new Vector3(0, 0, 0) }]);
         const animRotate = new Animation("hitRotate", "rotation.z", 60, Animation.ANIMATIONTYPE_FLOAT, Animation.ANIMATIONLOOPMODE_CONSTANT);
-        animRotate.setKeys([
-            { frame: 0, value: 0 },
-            { frame: 10, value: Math.PI }
-        ]);
-
+        animRotate.setKeys([{ frame: 0, value: 0 }, { frame: 10, value: Math.PI }]);
         star.animations = [animScale, animRotate];
-        this.scene.beginAnimation(star, 0, 10, false, 2, () => {
-            star.dispose();
-            mat.dispose();
-        });
+        this.scene.beginAnimation(star, 0, 10, false, 2, () => { star.dispose(); mat.dispose(); });
     }
 
     public getPlayerData() { return { health: this.p1.getHealth(), state: this.p1.state, pos: this.p1.mesh.position }; }
     public getAIData() { return { health: this.p2.getHealth(), state: this.p2.state, pos: this.p2.mesh.position }; }
     public getCountdownValue(): string {
-        if (this.countdownTimer > 2.5) return "3";
-        if (this.countdownTimer > 1.5) return "2";
-        if (this.countdownTimer > 0.5) return "1";
-        if (this.countdownTimer > -0.5) return "FIGHT!"; 
+        if (this.countdownTimer > 2.5) return "3"; if (this.countdownTimer > 1.5) return "2"; if (this.countdownTimer > 0.5) return "1"; if (this.countdownTimer > -0.5) return "FIGHT!"; 
         return "";
     }
-
     public getBattleTimer(): number { return Math.max(0, Math.ceil(this.battleTimer)); }
     public getGameState(): GameState { return this.gameState; }
     public getGamepadStatus(playerIndex: number): string { return this.inputManager.getGamepadStatus(playerIndex); }
