@@ -302,4 +302,5 @@ export class GameLoop {
     public getGameState(): GameState { return this.gameState; }
     public getGamepadStatus(playerIndex: number): string { return this.inputManager.getGamepadStatus(playerIndex); }
     public getMenuState() { return { row: this.menuSelectedRow, aiMode: this.currentAiMode }; }
+    public setVirtualInput(action: string, isPressed: boolean, playerIndex: number = 0): void { this.inputManager.setVirtualInput(action, isPressed, playerIndex); }
 }

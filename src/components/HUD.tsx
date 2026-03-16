@@ -17,8 +17,12 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
     const [p2Gamepad, setP2Gamepad] = useState("Disconnected");
     const [gameState, setGameState] = useState<string>("MAIN_MENU");
     const [selectedRow, setSelectedRow] = useState(0);
+    const [isTouch, setIsTouch] = useState(false);
 
     useEffect(() => {
+        // Detect touch support
+        setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
         const interval = setInterval(() => {
             if (gameLoop) {
                 const playerData = gameLoop.getPlayerData();
@@ -68,6 +72,69 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
         return cls;
     };
 
+    const setVirtualInput = (action: string, isPressed: boolean) => {
+        if (gameLoop) gameLoop.setVirtualInput(action, isPressed, 0);
+    };
+
+    // Virtual Controls UI
+    const renderTouchControls = () => {
+        if (!isTouch || gameState === "MAIN_MENU") return null;
+
+        return (
+            <div className="touch-controls">
+                <div className="left-stick-area">
+                    <button 
+                        onPointerDown={() => setVirtualInput("left", true)} 
+                        onPointerUp={() => setVirtualInput("left", false)}
+                        onPointerLeave={() => setVirtualInput("left", false)}
+                    >←</button>
+                    <div className="vertical-stack">
+                        <button 
+                            onPointerDown={() => setVirtualInput("up", true)} 
+                            onPointerUp={() => setVirtualInput("up", false)}
+                            onPointerLeave={() => setVirtualInput("up", false)}
+                        >↑</button>
+                        <button 
+                            onPointerDown={() => setVirtualInput("down", true)} 
+                            onPointerUp={() => setVirtualInput("down", false)}
+                            onPointerLeave={() => setVirtualInput("down", false)}
+                        >↓</button>
+                    </div>
+                    <button 
+                        onPointerDown={() => setVirtualInput("right", true)} 
+                        onPointerUp={() => setVirtualInput("right", false)}
+                        onPointerLeave={() => setVirtualInput("right", false)}
+                    >→</button>
+                </div>
+
+                <div className="pause-touch">
+                    <button onPointerDown={() => setVirtualInput("pause", true)} onPointerUp={() => setVirtualInput("pause", false)}>PAUSE</button>
+                </div>
+
+                <div className="action-buttons">
+                    <button 
+                        className="btn-a"
+                        onPointerDown={() => setVirtualInput("attack", true)} 
+                        onPointerUp={() => setVirtualInput("attack", false)}
+                        onPointerLeave={() => setVirtualInput("attack", false)}
+                    >PAW</button>
+                    <div className="step-btns">
+                        <button 
+                            onPointerDown={() => setVirtualInput("stepLeft", true)} 
+                            onPointerUp={() => setVirtualInput("stepLeft", false)}
+                            onPointerLeave={() => setVirtualInput("stepLeft", false)}
+                        >Q</button>
+                        <button 
+                            onPointerDown={() => setVirtualInput("stepRight", true)} 
+                            onPointerUp={() => setVirtualInput("stepRight", false)}
+                            onPointerLeave={() => setVirtualInput("stepRight", false)}
+                        >E</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     if (gameState === "MAIN_MENU") {
         return (
             <div className="hud">
@@ -91,7 +158,7 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
                         </div>
 
                         <div className="controls-footer">
-                            <p>Use D-PAD / WASD to Navigate | A / SPACE to Select</p>
+                            <p>{isTouch ? "Tap buttons to Navigate" : "Use D-PAD / WASD to Navigate | A / SPACE to Select"}</p>
                             <div className="gp-status-row">
                                 <span>P1: {p1Gamepad}</span>
                                 <span>P2: {p2Gamepad}</span>
@@ -171,11 +238,15 @@ export const HUD: React.FC<HUDProps> = ({ gameLoop }) => {
                 </div>
             )}
 
-            <div className="controls-hint">
-                P1: WASD (Move) | Q/E (Side-step) | SPACE (Attack) <br/>
-                {vsPlayer ? "P2: IJKL (Move) | U/O (Side-step) | ENTER (Attack)" : "ESC / START to Pause"} <br/>
-                Gamepad: L-Stick (Move) | LT/RT (Side-step) | A (Attack)
-            </div>
+            {!isTouch && (
+                <div className="controls-hint">
+                    P1: WASD (Move) | Q/E (Side-step) | SPACE (Attack) <br/>
+                    {vsPlayer ? "P2: IJKL (Move) | U/O (Side-step) | ENTER (Attack)" : "ESC / START to Pause"} <br/>
+                    Gamepad: L-Stick (Move) | LT/RT (Side-step) | A (Attack)
+                </div>
+            )}
+
+            {renderTouchControls()}
 
             {(playerHealth <= 0 || aiHealth <= 0 || timer <= 0) && (
                 <div className="game-over">

@@ -2,6 +2,12 @@ export class InputManager {
     private keys: { [key: string]: boolean } = {};
     private prevKeys: { [key: string]: boolean } = {};
     private gamepadIndices: (number | null)[] = [null, null]; // P1, P2
+    
+    // Virtual inputs for touch/UI
+    private virtualInputs: { [playerIndex: number]: { [action: string]: boolean } } = {
+        0: {},
+        1: {}
+    };
 
     constructor() {
         window.addEventListener("keydown", (e) => {
@@ -36,6 +42,10 @@ export class InputManager {
         }
     }
 
+    public setVirtualInput(action: string, isPressed: boolean, playerIndex: number = 0): void {
+        this.virtualInputs[playerIndex][action] = isPressed;
+    }
+
     private getGamepad(playerIndex: number): Gamepad | null {
         const index = this.gamepadIndices[playerIndex];
         if (index === null) return null;
@@ -50,6 +60,9 @@ export class InputManager {
     }
 
     public isPressed(action: string, playerIndex: number = 0): boolean {
+        // Virtual Input check (highest priority for touch)
+        if (this.virtualInputs[playerIndex][action]) return true;
+
         // Keyboard mapping
         if (playerIndex === 0) {
             switch(action) {
@@ -137,4 +150,3 @@ export class InputManager {
         return this.isPressed("restart", 0) || this.isPressed("restart", 1);
     }
 }
-
