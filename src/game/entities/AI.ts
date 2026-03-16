@@ -6,7 +6,7 @@ export type AIMode = "STAND" | "CROUCH" | "BLOCK" | "DEFEND" | "OFFENSE";
 export class AI extends Character {
     private target: Character | null = null;
     private attackCooldown: boolean = false;
-    private behaviorMode: AIMode = "STAND";
+    private behaviorMode: AIMode = "OFFENSE";
     private actionTimer: number = 0;
     private currentDecision: "MOVE_FWD" | "MOVE_BWD" | "SIDESTEP" | "WAIT" | "ATTACK" | "BLOCK" | "ESCAPE_WATER" = "WAIT";
     private sideStepDir: number = 1;

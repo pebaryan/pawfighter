@@ -20,7 +20,7 @@ export class GameLoop {
 
     // Menu State
     private menuSelectedRow: number = 0;
-    private currentAiMode: AIMode = "STAND";
+    private currentAiMode: AIMode = "OFFENSE";
 
     constructor(scene: Scene) {
         this.scene = scene;
