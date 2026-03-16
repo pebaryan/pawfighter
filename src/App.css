@@ -125,11 +125,13 @@ body {
   justify-content: center;
   align-items: center;
   z-index: 500;
+  pointer-events: all;
 }
 
 .main-menu-content {
   text-align: center;
   animation: fadeIn 1s ease-out;
+  pointer-events: all;
 }
 
 .game-title {
@@ -205,6 +207,7 @@ body {
   padding: 0 40px;
   pointer-events: none;
   z-index: 400;
+  box-sizing: border-box;
 }
 
 .touch-controls button {
