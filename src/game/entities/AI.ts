@@ -1,7 +1,7 @@
 import { Scene, Color3, Vector3 } from "@babylonjs/core";
 import { Character, CharacterState } from "./Character";
 
-export type AIMode = "STAND" | "CROUCH" | "DEFEND" | "OFFENSE";
+export type AIMode = "STAND" | "CROUCH" | "BLOCK" | "DEFEND" | "OFFENSE";
 
 export class AI extends Character {
     private target: Character | null = null;
@@ -13,7 +13,7 @@ export class AI extends Character {
 
     constructor(scene: Scene) {
         super("ai", scene, new Color3(0.5, 0.5, 0.5)); // Grey cat
-        this.mesh.position.x = 5;
+        this.mesh.position.x = 25;
     }
 
     public setTarget(target: Character): void { this.target = target; }
@@ -26,6 +26,7 @@ export class AI extends Character {
         switch (this.behaviorMode) {
             case "STAND": this.crouch(false); break;
             case "CROUCH": this.crouch(true); break;
+            case "BLOCK": this.state = CharacterState.BLOCKING; break;
             case "DEFEND": this.updateDefendBehavior(distance, deltaTime); break;
             case "OFFENSE": this.updateOffenseBehavior(distance, deltaTime); break;
         }
@@ -70,6 +71,7 @@ export class AI extends Character {
     public attack(): void {
         if (this.state === CharacterState.ATTACKING || this.state === CharacterState.JUMPING) return;
         this.state = CharacterState.ATTACKING;
+        this.hasHitThisAttack = false;
         this.attackCooldown = true;
         this.playAttackAnimation();
         setTimeout(() => {

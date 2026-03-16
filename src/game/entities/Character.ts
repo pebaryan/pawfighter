@@ -1,4 +1,4 @@
-import { Scene, Mesh, MeshBuilder, Vector3, StandardMaterial, Color3, TransformNode, Animation, Quaternion } from "@babylonjs/core";
+import { Scene, Mesh, MeshBuilder, Vector3, StandardMaterial, Color3, TransformNode, Animation, Quaternion, Engine } from "@babylonjs/core";
 
 export const CharacterState = {
     IDLE: 0,
@@ -8,7 +8,9 @@ export const CharacterState = {
     STUNNED: 4,
     KO: 5,
     JUMPING: 6,
-    CROUCHING: 7
+    CROUCHING: 7,
+    BLOCKING: 8,
+    ROLLING: 9
 } as const;
 
 export type CharacterState = typeof CharacterState[keyof typeof CharacterState];
@@ -16,6 +18,9 @@ export type CharacterState = typeof CharacterState[keyof typeof CharacterState];
 export class Character {
     public mesh: TransformNode;
     public state: CharacterState = CharacterState.IDLE;
+    public hasHitThisAttack: boolean = false;
+    public counterTimer: number = 0; // Window to perform a counter-attack
+    
     protected scene: Scene;
     protected body: Mesh;
     protected head: Mesh;
@@ -25,6 +30,7 @@ export class Character {
     protected health: number = 100;
     protected trailMeshes: { root: TransformNode, mat: StandardMaterial, alpha: number }[] = [];
     protected trailTimer: number = 0;
+    protected blockingShield: Mesh | null = null;
 
     protected velocityY: number = 0;
     protected gravity: number = -20;
@@ -33,12 +39,18 @@ export class Character {
     
     protected targetPosition: Vector3 = new Vector3(0, 0, 0);
 
+    // Roll properties
+    private rollDirection: Vector3 = Vector3.Zero();
+    private rollSpeed: number = 15;
+    private rollRotationSpeed: number = 15;
+
     constructor(name: string, scene: Scene, color: Color3) {
         this.scene = scene;
         this.mesh = new TransformNode(name, scene);
         this.body = this.createCatMesh(name, color);
         this.body.parent = this.mesh;
         this.head = this.mesh.getChildMeshes().find(m => m.name.includes("head")) as Mesh;
+        this.createBlockingShield();
     }
 
     private createCatMesh(name: string, color: Color3): Mesh {
@@ -48,10 +60,7 @@ export class Character {
         body.position.y = 0.5;
         body.material = material;
         const head = MeshBuilder.CreateBox(`${name}-head`, { size: 0.8 }, this.scene);
-        head.position.y = 1.3;
-        head.position.z = 0.6;
-        head.material = material;
-        head.parent = body;
+        head.position.y = 1.3; head.position.z = 0.6; head.material = material; head.parent = body;
         const earSize = 0.3;
         const leftEar = MeshBuilder.CreateBox(`${name}-ear-l`, { size: earSize }, this.scene);
         leftEar.position.y = 0.4; leftEar.position.x = -0.25; leftEar.rotation.z = Math.PI / 4;
@@ -70,17 +79,33 @@ export class Character {
         return body;
     }
 
+    private createBlockingShield(): void {
+        this.blockingShield = MeshBuilder.CreateSphere("shield", { diameter: 2.2 }, this.scene);
+        this.blockingShield.parent = this.mesh;
+        this.blockingShield.position.y = 1.0;
+        this.blockingShield.position.z = 0.2;
+        const mat = new StandardMaterial("shieldMat", this.scene);
+        mat.diffuseColor = new Color3(0.2, 0.6, 1.0);
+        mat.emissiveColor = new Color3(0.1, 0.3, 0.5);
+        mat.alpha = 0.3;
+        mat.alphaMode = Engine.ALPHA_ADD;
+        this.blockingShield.material = mat;
+        this.blockingShield.isVisible = false;
+        this.blockingShield.isPickable = false;
+    }
+
     public faceTarget(targetPos: Vector3): void {
+        if (this.state === CharacterState.ROLLING) return;
         this.targetPosition = targetPos;
         const diff = targetPos.subtract(this.mesh.position);
         this.mesh.rotation.y = Math.atan2(diff.x, diff.z);
     }
 
     public move(forwardAmount: number, sideStepAmount: number, deltaTime: number): void {
-        if (this.state === CharacterState.KO || this.state === CharacterState.STUNNED) return;
+        if (this.state === CharacterState.KO || this.state === CharacterState.STUNNED || this.state === CharacterState.ROLLING) return;
 
         const speed = 7;
-        const sideStepRotateSpeed = 1.5; // Radians per second
+        const sideStepRotateSpeed = 0.8; // Reduced for smoothness
         
         // 1. Forward/Backward Movement
         if (Math.abs(forwardAmount) > 0.01) {
@@ -92,26 +117,31 @@ export class Character {
         // 2. Circular Side-Stepping
         if (Math.abs(sideStepAmount) > 0.01) {
             const rotationAngle = -sideStepAmount * sideStepRotateSpeed * deltaTime;
+            
             const offset = this.mesh.position.subtract(this.targetPosition);
             const matrix = new Quaternion();
             Quaternion.RotationAxisToRef(Vector3.Up(), rotationAngle, matrix);
             const rotatedOffset = new Vector3();
             offset.rotateByQuaternionToRef(matrix, rotatedOffset);
-            this.mesh.position.copyFrom(this.targetPosition.add(rotatedOffset));
+            
+            // Move toward target position with new offset
+            const targetPos = this.targetPosition.add(rotatedOffset);
+            this.mesh.position = Vector3.Lerp(this.mesh.position, targetPos, 0.8); // Smooth transition
         }
 
-        // Update State
-        if (Math.abs(forwardAmount) > 0.1 || Math.abs(sideStepAmount) > 0.1) {
-            if (this.isGrounded && this.state !== CharacterState.ATTACKING) {
+        if (this.isGrounded && this.state !== CharacterState.ATTACKING) {
+            if (forwardAmount < -0.1 && Math.abs(sideStepAmount) < 0.1) {
+                this.state = CharacterState.BLOCKING;
+            } else if (Math.abs(forwardAmount) > 0.1 || Math.abs(sideStepAmount) > 0.1) {
                 this.state = CharacterState.RUNNING;
+            } else if (this.state !== CharacterState.CROUCHING) {
+                this.state = CharacterState.IDLE;
             }
-        } else if (this.isGrounded && this.state !== CharacterState.ATTACKING && this.state !== CharacterState.CROUCHING) {
-            this.state = CharacterState.IDLE;
         }
     }
 
     public jump(): void {
-        if (this.isGrounded && this.state !== CharacterState.KO) {
+        if (this.isGrounded && this.state !== CharacterState.KO && this.state !== CharacterState.ROLLING) {
             this.velocityY = this.jumpForce;
             this.isGrounded = false;
             this.state = CharacterState.JUMPING;
@@ -119,7 +149,7 @@ export class Character {
     }
 
     public crouch(isCrouching: boolean): void {
-        if (!this.isGrounded || this.state === CharacterState.KO) return;
+        if (!this.isGrounded || this.state === CharacterState.KO || this.state === CharacterState.ROLLING) return;
         if (isCrouching) {
             this.state = CharacterState.CROUCHING;
             this.body.scaling.y = 0.6; this.body.position.y = 0.3;
@@ -127,6 +157,20 @@ export class Character {
             this.state = CharacterState.IDLE;
             this.body.scaling.y = 1.0; this.body.position.y = 0.5;
         }
+    }
+
+    public triggerRoll(fromPosition: Vector3): void {
+        this.state = CharacterState.ROLLING;
+        this.rollDirection = this.mesh.position.subtract(fromPosition).normalize();
+        this.rollDirection.y = 0;
+        
+        // Duration handled by state timeout or update check
+        setTimeout(() => {
+            if (this.state === CharacterState.ROLLING) {
+                this.state = CharacterState.IDLE;
+                this.body.rotation.x = 0;
+            }
+        }, 600);
     }
 
     public takeDamage(amount: number): void {
@@ -144,7 +188,25 @@ export class Character {
     private onKO(): void { this.mesh.rotation.z = Math.PI / 2; }
 
     public update(deltaTime: number): void {
-        // Sample terrain height
+        if (this.counterTimer > 0) this.counterTimer -= deltaTime;
+
+        // Handle Rolling Animation & Physics
+        if (this.state === CharacterState.ROLLING) {
+            this.mesh.position.addInPlace(this.rollDirection.scale(this.rollSpeed * deltaTime));
+            this.body.rotation.x -= this.rollRotationSpeed * deltaTime;
+        } else {
+            this.body.rotation.x = 0;
+        }
+
+        // Shield visibility
+        if (this.blockingShield) {
+            this.blockingShield.isVisible = (this.state === CharacterState.BLOCKING);
+            if (this.blockingShield.isVisible) {
+                this.blockingShield.rotation.y += deltaTime * 5;
+            }
+        }
+
+        // Terrain height
         const terrain = this.scene.getMeshByName("terrain");
         let groundHeight = 0;
         if (terrain) {
@@ -154,11 +216,10 @@ export class Character {
             }
         }
 
-        // Apply Gravity
+        // Gravity
         if (!this.isGrounded) {
             this.velocityY += this.gravity * deltaTime;
             this.mesh.position.y += this.velocityY * deltaTime;
-
             if (this.mesh.position.y <= groundHeight) {
                 this.mesh.position.y = groundHeight;
                 this.isGrounded = true;
@@ -171,13 +232,13 @@ export class Character {
 
         if (this.state === CharacterState.RUNNING) {
             this.body.position.y = 0.5 + Math.sin(Date.now() * 0.015) * 0.1;
-        } else if (this.state === CharacterState.IDLE) {
+        } else if (this.state === CharacterState.IDLE || this.state === CharacterState.BLOCKING) {
             this.body.position.y = 0.5;
         }
 
-        // Shadow Trail Logic - Run at the END of update to capture final frame pose
+        // Shadow Trail Logic
         this.updateTrails(deltaTime);
-        if (this.state === CharacterState.RUNNING || this.state === CharacterState.JUMPING || this.state === CharacterState.ATTACKING) {
+        if (this.state === CharacterState.RUNNING || this.state === CharacterState.JUMPING || this.state === CharacterState.ATTACKING || this.state === CharacterState.ROLLING) {
             this.trailTimer += deltaTime;
             if (this.trailTimer > 0.05) {
                 this.spawnTrail();
@@ -189,11 +250,10 @@ export class Character {
     private updateTrails(deltaTime: number): void {
         for (let i = this.trailMeshes.length - 1; i >= 0; i--) {
             const t = this.trailMeshes[i];
-            t.alpha -= deltaTime * 2.5; // Fade slightly faster for cleaner look
+            t.alpha -= deltaTime * 2.5;
             t.mat.alpha = t.alpha;
-            
             if (t.alpha <= 0) {
-                t.root.dispose(false, true); // Recurse to dispose all piece clones
+                t.root.dispose(false, true);
                 t.mat.dispose();
                 this.trailMeshes.splice(i, 1);
             }
@@ -201,30 +261,22 @@ export class Character {
     }
 
     protected spawnTrail(): void {
-        // Force world matrix update for the entire hierarchy to ensure absolute accuracy
         this.mesh.computeWorldMatrix(true);
-
         const trailGroup = new TransformNode("trailSnapshot", this.scene);
         const trailMat = new StandardMaterial("trailMat", this.scene);
         const sourceMat = this.body.material as StandardMaterial;
-        
-        // Slightly different tint for the trail
         trailMat.diffuseColor = sourceMat ? sourceMat.diffuseColor.clone().scale(1.2) : Color3.Gray();
         trailMat.alpha = 0.4;
-        trailMat.transparencyMode = 2; // ALPHABLEND
+        trailMat.transparencyMode = 2;
 
-        // Flatten the hierarchy into the trailGroup using world coordinates
         const parts = [this.body, ...this.body.getChildMeshes()];
         parts.forEach(source => {
-            if (source instanceof Mesh) {
-                // Clone without children (doNotCloneChildren = true)
+            if (source instanceof Mesh && source.name !== "shield") {
                 const clone = source.clone(source.name + "_trail", trailGroup, true);
                 if (clone) {
                     clone.material = trailMat;
                     clone.isPickable = false;
                     clone.receiveShadows = false;
-                    
-                    // Capture EXACT world pose
                     const wm = source.getWorldMatrix();
                     clone.position = Vector3.Zero();
                     clone.rotationQuaternion = new Quaternion();
@@ -233,7 +285,6 @@ export class Character {
                 }
             }
         });
-
         this.trailMeshes.push({ root: trailGroup, mat: trailMat, alpha: 0.4 });
     }
 

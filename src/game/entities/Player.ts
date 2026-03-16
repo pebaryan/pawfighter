@@ -12,7 +12,7 @@ export class Player extends Character {
         super(playerIndex === 0 ? "player1" : "player2", scene, color);
         this.inputManager = inputManager;
         this.playerIndex = playerIndex;
-        this.mesh.position.x = playerIndex === 0 ? -5 : 5;
+        this.mesh.position.x = playerIndex === 0 ? -25 : 25;
     }
 
     public update(deltaTime: number): void {
@@ -56,6 +56,7 @@ export class Player extends Character {
     public attack(): void {
         if (this.state === CharacterState.ATTACKING || this.state === CharacterState.JUMPING) return;
         this.state = CharacterState.ATTACKING;
+        this.hasHitThisAttack = false;
         this.attackCooldown = true;
         this.playAttackAnimation();
         setTimeout(() => {
