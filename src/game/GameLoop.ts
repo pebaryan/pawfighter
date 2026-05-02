@@ -2,7 +2,7 @@ import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, Animation, Engin
 import { Player } from "./entities/Player";
 import { AI, type AIMode } from "./entities/AI";
 import { InputManager } from "./InputManager";
-import { CharacterState } from "./entities/Character";
+import { Character, CharacterState } from "./entities/Character";
 
 export type GameState = "MAIN_MENU" | "COUNTDOWN" | "BATTLE" | "GAMEOVER" | "PAUSED";
 
